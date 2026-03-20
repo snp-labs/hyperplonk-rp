@@ -8,9 +8,11 @@
 pub use crate::pcs::{
     errors::PCSError,
     multilinear_kzg::{
-        batching::BatchProof,
+        batch_open_timing_stats,
+        batching::{BatchProof, BatchProofWithoutEvals},
+        reset_batch_open_timing_stats, scoped_batch_open_context, set_batch_open_timing_enabled,
         srs::{MultilinearProverParam, MultilinearUniversalParams, MultilinearVerifierParam},
-        MultilinearKzgPCS, MultilinearKzgProof,
+        BatchOpenContextGuard, BatchOpenTimingStat, MultilinearKzgPCS, MultilinearKzgProof,
     },
     structs::Commitment,
     univariate_kzg::{

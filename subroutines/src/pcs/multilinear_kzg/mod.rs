@@ -31,6 +31,11 @@ use std::ops::Mul;
 use srs::{MultilinearProverParam, MultilinearUniversalParams, MultilinearVerifierParam};
 use transcript::IOPTranscript;
 
+pub use self::batching::{
+    batch_open_timing_stats, reset_batch_open_timing_stats, scoped_batch_open_context,
+    set_batch_open_timing_enabled,
+    BatchOpenContextGuard, BatchOpenTimingStat,
+};
 use self::batching::{batch_verify_internal, multi_open_internal};
 
 #[derive(Clone)]
@@ -203,7 +208,7 @@ fn open_internal<E: Pairing>(
     polynomial: &DenseMultilinearExtension<E::ScalarField>,
     point: &[E::ScalarField],
 ) -> Result<(MultilinearKzgProof<E>, E::ScalarField), PCSError> {
-    let open_timer = start_timer!(|| format!("open mle with {} variable", polynomial.num_vars));
+    let open_timer = start_timer!(|| format!("pcs_open_total nv={}", polynomial.num_vars));
 
     if polynomial.num_vars() > prover_param.num_vars {
         return Err(PCSError::InvalidParameters(format!(
@@ -223,7 +228,9 @@ fn open_internal<E: Pairing>(
     let nv = polynomial.num_vars();
     // the first `ignored` SRS vectors are unused for opening.
     let ignored = prover_param.num_vars - nv + 1;
+    let clone_timer = start_timer!(|| format!("pcs_open_clone initial_evaluations nv={}", nv));
     let mut f = polynomial.to_evaluations();
+    end_timer!(clone_timer);
 
     let mut proofs = Vec::new();
 
@@ -232,14 +239,21 @@ fn open_internal<E: Pairing>(
         .zip(prover_param.powers_of_g[ignored..ignored + nv].iter())
         .enumerate()
     {
-        let ith_round = start_timer!(|| format!("{}-th round", i));
+        let ith_round = start_timer!(|| format!("pcs_open_round index={}", i));
 
         let k = nv - 1 - i;
         let cur_dim = 1 << k;
+        let alloc_timer = start_timer!(|| format!("pcs_open_alloc round={} len={}", i, cur_dim));
         let mut q = vec![E::ScalarField::zero(); cur_dim];
         let mut r = vec![E::ScalarField::zero(); cur_dim];
+        end_timer!(alloc_timer);
 
-        let ith_round_eval = start_timer!(|| format!("{}-th round eval", i));
+        let quotient_timer =
+            start_timer!(|| format!("pcs_open_quotient round={} len={}", i, cur_dim));
+        let fix_variables_timer =
+            start_timer!(|| format!("pcs_open_fix_variables round={} len={}", i, cur_dim));
+        let dense_scan_timer =
+            start_timer!(|| format!("pcs_open_dense_scan round={} len={}", i, cur_dim));
         for b in 0..(1 << k) {
             // q[b] = f[1, b] - f[0, b]
             q[b] = f[(b << 1) + 1] - f[b << 1];
@@ -247,18 +261,24 @@ fn open_internal<E: Pairing>(
             // r[b] = f[0, b] + q[b] * p
             r[b] = f[b << 1] + (q[b] * point_at_k);
         }
+        end_timer!(dense_scan_timer);
         f = r;
-        end_timer!(ith_round_eval);
+        end_timer!(fix_variables_timer);
+        end_timer!(quotient_timer);
 
         // this is a MSM over G1 and is likely to be the bottleneck
-        let msm_timer = start_timer!(|| format!("msm of size {} at round {}", gi.evals.len(), i));
+        let msm_timer =
+            start_timer!(|| format!("pcs_open_msm round={} size={}", i, gi.evals.len()));
 
         proofs.push(E::G1::msm_unchecked(&gi.evals, &q).into_affine());
         end_timer!(msm_timer);
 
         end_timer!(ith_round);
     }
+    let fix_variables_timer =
+        start_timer!(|| format!("pcs_open_fix_variables final_eval nv={}", nv));
     let eval = evaluate_opt(polynomial, point);
+    end_timer!(fix_variables_timer);
     end_timer!(open_timer);
     Ok((MultilinearKzgProof { proofs }, eval))
 }

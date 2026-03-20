@@ -118,7 +118,7 @@ impl<E: Pairing> StructuredReferenceString<E> for UnivariateUniversalParams<E> {
             cur *= &beta;
         }
 
-        let g_batch_mul_preprocessing = BatchMulPreprocessing::<E::G1>::new(g, max_degree+1);
+        let g_batch_mul_preprocessing = BatchMulPreprocessing::<E::G1>::new(g, max_degree + 1);
         let powers_of_g = g_batch_mul_preprocessing.batch_mul(&powers_of_beta);
 
         let h = h.into_affine();

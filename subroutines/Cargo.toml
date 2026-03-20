@@ -5,7 +5,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-arithmetic = { path = "../arithmetic" }
+arithmetic = { path = "../arithmetic", default-features = false }
 ark-bls12-381 = { version = "0.5.0", default-features = false, features = [
     "curve",
 ] }
@@ -20,7 +20,8 @@ itertools = { version = "0.13.0", optional = true }
 rand_chacha = { version = "0.3.0", default-features = false }
 rayon = { version = "1.5.2", default-features = false, optional = true }
 transcript = { path = "../transcript" }
-util = { path = "../util" }
+util = { path = "../util", default-features = false }
+libc = "0.2"
 # # Benchmarks
 # [[bench]]
 # name = "poly-iop-benches"

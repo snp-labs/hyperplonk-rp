@@ -6,14 +6,18 @@
 
 //! Useful utilities for KZG PCS
 use ark_ff::PrimeField;
+#[cfg(test)]
 use ark_poly::DenseMultilinearExtension;
-use ark_std::{end_timer, start_timer, vec::Vec};
+#[cfg(test)]
+use ark_std::vec::Vec;
+use ark_std::{end_timer, start_timer};
 
 use crate::PCSError;
 
 /// Generate eq(t,x), a product of multilinear polynomials with fixed t.
 /// eq(a,b) is takes extensions of a,b in {0,1}^num_vars such that if a and b in
 /// {0,1}^num_vars are equal then this polynomial evaluates to 1.
+#[cfg(test)]
 pub(crate) fn eq_extension<F: PrimeField>(t: &[F]) -> Vec<DenseMultilinearExtension<F>> {
     let start = start_timer!(|| "eq extension");
 

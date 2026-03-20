@@ -16,6 +16,7 @@ use ark_std::{
     rand::{Rng, RngCore},
     start_timer,
 };
+#[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use std::{cmp::max, collections::HashMap, marker::PhantomData, ops::Add, sync::Arc};
 
@@ -414,6 +415,7 @@ fn build_eq_x_r_helper<F: PrimeField>(r: &[F], buf: &mut Vec<F>) -> Result<(), A
         // *buf = res;
 
         let mut res = vec![F::zero(); buf.len() << 1];
+        #[cfg(feature = "parallel")]
         res.par_iter_mut().enumerate().for_each(|(i, val)| {
             let bi = buf[i >> 1];
             let tmp = r[0] * bi;
@@ -423,6 +425,16 @@ fn build_eq_x_r_helper<F: PrimeField>(r: &[F], buf: &mut Vec<F>) -> Result<(), A
                 *val = tmp;
             }
         });
+        #[cfg(not(feature = "parallel"))]
+        for (i, val) in res.iter_mut().enumerate() {
+            let bi = buf[i >> 1];
+            let tmp = r[0] * bi;
+            if i & 1 == 0 {
+                *val = bi - tmp;
+            } else {
+                *val = tmp;
+            }
+        }
         *buf = res;
     }
 

@@ -10,7 +10,7 @@ pub use crate::poly_iop::{
     errors::PolyIOPErrors,
     // perm_check::PermutationCheck, prod_check::ProductCheck,
     structs::IOPProof,
-    sum_check::SumCheck,
+    sum_check::{prove_mixed_sparse_products, SparseSupportProduct, SumCheck},
     utils::*,
     // zero_check::ZeroCheck,
     PolyIOP,

@@ -18,8 +18,11 @@ use ark_std::{end_timer, start_timer};
 use std::{fmt::Debug, sync::Arc};
 use transcript::IOPTranscript;
 
+mod mixed_prover;
 mod prover;
 mod verifier;
+
+pub use mixed_prover::{prove_mixed_sparse_products, SparseSupportProduct};
 
 /// Trait for doing sum check protocols.
 pub trait SumCheck<F: PrimeField> {
@@ -162,24 +165,50 @@ impl<F: PrimeField> SumCheck<F> for PolyIOP<F> {
         transcript: &mut Self::Transcript,
     ) -> Result<Self::SumCheckProof, PolyIOPErrors> {
         let start = start_timer!(|| "sum check prove");
+        let rounds_total = start_timer!(|| {
+            format!(
+                "sumcheck_f_rounds_total num_rounds={} products={} flattened_mles={} max_degree={}",
+                poly.aux_info.num_variables,
+                poly.products.len(),
+                poly.flattened_ml_extensions.len(),
+                poly.aux_info.max_degree
+            )
+        });
 
         transcript.append_serializable_element(b"aux info", &poly.aux_info)?;
 
         let mut prover_state = IOPProverState::prover_init(poly)?;
         let mut challenge = None;
         let mut prover_msgs = Vec::with_capacity(poly.aux_info.num_variables);
-        for _ in 0..poly.aux_info.num_variables {
+        for round in 0..poly.aux_info.num_variables {
+            let round_timer = start_timer!(|| {
+                format!(
+                    "sumcheck_f_round index={} remaining_vars={}",
+                    round,
+                    poly.aux_info.num_variables.saturating_sub(round)
+                )
+            });
             let prover_msg =
                 IOPProverState::prove_round_and_update_state(&mut prover_state, &challenge)?;
+            let round_message = start_timer!(|| {
+                format!(
+                    "sumcheck_f_round_message index={} evals={}",
+                    round,
+                    prover_msg.evaluations.len()
+                )
+            });
             transcript.append_serializable_element(b"prover msg", &prover_msg)?;
             prover_msgs.push(prover_msg);
             challenge = Some(transcript.get_and_append_challenge(b"Internal round")?);
+            end_timer!(round_message);
+            end_timer!(round_timer);
         }
         // pushing the last challenge point to the state
         if let Some(p) = challenge {
             prover_state.challenges.push(p)
         };
 
+        end_timer!(rounds_total);
         end_timer!(start);
         Ok(IOPProof {
             point: prover_state.challenges,
